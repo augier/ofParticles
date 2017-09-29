@@ -5,17 +5,27 @@ void ofApp::setup(){
     // set the background to black for max contrast
     ofBackground(0);
 
-    particle.setup();
+    const int NUM_PARTICLES = 100;
+
+    for(int i=0; i<NUM_PARTICLES; i++){
+        Particle particle;
+        particle.setup();
+        particles.push_back(particle);
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
-    particle.update();
+    for(int i=0; i<particles.size(); i++){
+        particles[i].update();
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    particle.draw();
+    for(int i=0; i<particles.size(); i++){
+        particles[i].draw();
+    }
 }
 
 // set up a particle

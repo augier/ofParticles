@@ -21,6 +21,6 @@ class ofApp : public ofBaseApp{
 		void update();
 		void draw();
 
-        Particle particle;
+        vector<Particle> particles;
 };
 
