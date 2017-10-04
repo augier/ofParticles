@@ -5,7 +5,7 @@ void ofApp::setup(){
     // set the background to black for max contrast
     ofBackground(0);
 
-    const int NUM_PARTICLES = 10;
+    const int NUM_PARTICLES = 5;
 
     for(int i=0; i<NUM_PARTICLES; i++){
         Particle particle;
@@ -14,14 +14,24 @@ void ofApp::setup(){
     }
 
     for(int i=0; i<particles.size(); i++){
+        particles[i].setDebug(&debug);
         particles[i].setParticles(&particles);
     }
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
+    // first set all of the particles updated to be false
+    for(int i=0; i<particles.size(); i++){
+        particles[i].updated = false;
+    }
     for(int i=0; i<particles.size(); i++){
         particles[i].update();
+    }
+
+    energy = 0;
+    for(int i=0; i<particles.size(); i++){
+        energy += particles[i].energy;
     }
 }
 
@@ -30,6 +40,16 @@ void ofApp::draw(){
     for(int i=0; i<particles.size(); i++){
         particles[i].draw();
     }
+
+    ofSetColor(255);
+    ofDrawBitmapString("Total energy: " + to_string(energy), 10, 10);
+}
+
+void ofApp::keyPressed(int key){
+    switch (key){
+    case 100: // d
+        debug = !debug;
+    }
 }
 
 // set up a particle
@@ -37,15 +57,18 @@ void Particle::setup(){
     // assign a randomised radius
     // we assume this is 'infinitesimally small' and therefore
     // the ignore the actual radius except for visualising
-    radius = 20;
+    radius = ofRandom(5, 40);
+
+    // we'll calculate it's mass as it's surface area
+    mass = 2 * pi * pow(radius, 2);
 
     // assign it's starting position
     pos.x = ofRandom(radius, ofGetWidth() - radius);
     pos.y = ofRandom(radius, ofGetHeight() - radius);
 
     // assign it's velocity
-    velocity.x = ofRandom(-5, 5);
-    velocity.y = ofRandom(-5, 5);
+    velocity.x = ofRandom(-3, 3);
+    velocity.y = ofRandom(-3, 3);
 
     // give it a randomised colour
     colour.r = ofRandom(0, 255);
@@ -55,9 +78,6 @@ void Particle::setup(){
 
 // particles bounce off the edges of the container with no forces
 void Particle::update(){
-    // update the position using the particles velocity
-    pos.x += velocity.x;
-    pos.y += velocity.y;
 
     // calculate min and max for both x and y
     // to keep the maths simple, ignore the radius
@@ -83,6 +103,12 @@ void Particle::update(){
         velocity *= reverseY;
     }
 
+    // check to see if this particle has already been updated
+    // by another. Perhaps find a better way of achieving this
+    if (updated){
+        return;
+    }
+
     // TODO think about what if they interact at a wall?
 
     for(int i=0; i<particles->size(); i++){
@@ -93,16 +119,50 @@ void Particle::update(){
             continue;
         }
 
+        // check to see if this particle is interacting with
+        // the other particle
         if (isInteracting(&particles->at(i))){
-            colour = ofColor(255,0,0);
+            // get all the required information
+            Particle particle2 = particles->at(i);
+            float m1 = mass;
+            float m2 = particle2.mass;
+            ofVec2f v1 = velocity;
+            ofVec2f v2 = particle2.velocity;
+            ofVec2f p1 = pos;
+            ofVec2f p2 = particle2.pos;
+
+            // This mdoel is taken from http://www.euclideanspace.com/physics/dynamics/collision/twod/
+            // and assumes the two particles hit each other head on. This will mean that there is some
+            // strange behaviour.
+            velocity = (v1 * (m1 - m2) / (m1 + m2)) + (v2 * (2 * m2) / (m1 + m2));
+            ofVec2f newVelocity = (v1 * (2 * m1) / (m1 + m2)) - (v2 * (m1 - m2) / (m1 + m2));
+
+            particles->at(i).velocity = newVelocity;
+            particles->at(i).pos += particles->at(i).velocity;
+            updated = true;
+            particles->at(i).updated = true;
         }
     }
+
+    // update the position using the particles velocity
+    pos += velocity;
+    energy = 0.5 * mass * pow(velocity.length(), 2);
 }
 
 // draw the particle (the easy bit!)
 void Particle::draw(){
     ofSetColor(colour);
     ofDrawCircle(pos.x, pos.y, radius);
+
+    // write debug information
+    if (*debug){
+        ofDrawBitmapString(energy, pos.x + radius, pos.y + radius);
+    }}
+
+// debug is a variable at ofApp level. Perhaps look at extending
+// particle class to be of ofBaseApp also?that'
+void Particle::setDebug(bool * d){
+    debug = d;
 }
 
 void Particle::setParticles(vector<Particle> *p){
