@@ -57,8 +57,8 @@ void Particle::update(){
     // position with one edge at a time. Each time an edge
     // is reached the velocity
 
-    ofVec2f reverseX(-1, 1);
-    ofVec2f reverseY(1, -1);
+    ofVec2f reverseX(-0.5, 1);
+    ofVec2f reverseY(1, -0.5);
 
     // right
     if (pos.x > maxX || pos.x < minX){
