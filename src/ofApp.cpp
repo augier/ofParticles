@@ -5,7 +5,7 @@ void ofApp::setup(){
     // set the background to black for max contrast
     ofBackground(0);
 
-    const int NUM_PARTICLES = 5;
+    const int NUM_PARTICLES = 200;
 
     for(int i=0; i<NUM_PARTICLES; i++){
         Particle particle;
@@ -57,18 +57,23 @@ void Particle::setup(){
     // assign a randomised radius
     // we assume this is 'infinitesimally small' and therefore
     // the ignore the actual radius except for visualising
-    radius = ofRandom(5, 40);
+    radius = ofRandom(5, 10);
 
+//    radius = r;
     // we'll calculate it's mass as it's surface area
-    mass = 2 * pi * pow(radius, 2);
+    m = 2 * pi * pow(radius, 2);
 
     // assign it's starting position
-    pos.x = ofRandom(radius, ofGetWidth() - radius);
-    pos.y = ofRandom(radius, ofGetHeight() - radius);
+    p.x = ofRandom(radius, ofGetWidth() - radius);
+    p.y = ofRandom(radius, ofGetHeight() - radius);
 
     // assign it's velocity
-    velocity.x = ofRandom(-3, 3);
-    velocity.y = ofRandom(-3, 3);
+    v.x = ofRandom(-3, 3);
+    v.y = ofRandom(-3, 3);
+
+    // assign a random angular velocity
+    w.x = ofRandom(-0.5, 0.5);
+    w.y = ofRandom(-0.5, 0.5);
 
     // give it a randomised colour
     colour.r = ofRandom(0, 255);
@@ -95,12 +100,12 @@ void Particle::update(){
     ofVec2f reverseY(1, -1);
 
     // right
-    if (pos.x > maxX || pos.x < minX){
-        velocity *= reverseX;
+    if (p.x > maxX || p.x < minX){
+        v *= reverseX;
     }
 
-    if (pos.y > maxY || pos.y < minY){
-        velocity *= reverseY;
+    if (p.y > maxY || p.y < minY){
+        v *= reverseY;
     }
 
     // check to see if this particle has already been updated
@@ -114,49 +119,94 @@ void Particle::update(){
     for(int i=0; i<particles->size(); i++){
         // check that the particle isn't this particle
         // (is there a better way of doing this?)
-        if (pos.x == particles->at(i).pos.x &&
-            pos.y == particles->at(i).pos.y){
+        if (p.x == particles->at(i).p.x &&
+            p.y == particles->at(i).p.y){
             continue;
         }
 
+
+        Particle * particle2 = &particles->at(i);
         // check to see if this particle is interacting with
         // the other particle
-        if (isInteracting(&particles->at(i))){
-            // get all the required information
-            Particle particle2 = particles->at(i);
-            float m1 = mass;
-            float m2 = particle2.mass;
-            ofVec2f v1 = velocity;
-            ofVec2f v2 = particle2.velocity;
-            ofVec2f p1 = pos;
-            ofVec2f p2 = particle2.pos;
+        if (isInteracting(particle2)){
+            // Using the following model to update veloctiy and angular velocity:
+            // http://www.euclideanspace.com/physics/dynamics/collision/twod/
 
-            // This mdoel is taken from http://www.euclideanspace.com/physics/dynamics/collision/twod/
-            // and assumes the two particles hit each other head on. This will mean that there is some
-            // strange behaviour.
-            velocity = (v1 * (m1 - m2) / (m1 + m2)) + (v2 * (2 * m2) / (m1 + m2));
-            ofVec2f newVelocity = (v1 * (2 * m1) / (m1 + m2)) - (v2 * (m1 - m2) / (m1 + m2));
+            // get all the required information:
+            // mass
+            float m1 = m;
+            float m2 = particle2->m;
+            // radii
+            float radius1 = radius;
+            float radius2 = particle2->radius;
+            // inertia
+            float i1 = (pi/2)*pow(radius1, 4);
+            float i2 = (pi/2)*pow(radius2, 4);
+            // velocity
+            ofVec2f v1 = v;
+            ofVec2f v2 = particle2->v;
+            // position
+            ofVec2f p1 = p;
+            ofVec2f p2 = particle2->p;
+            // angular momentum
+            ofVec2f w1 = w;
+            ofVec2f w2 = particle2->w;
 
-            particles->at(i).velocity = newVelocity;
-            particles->at(i).pos += particles->at(i).velocity;
+            // relative vector of collision point to centre of mass
+            ofVec2f r1 = (p1 - p2).scale(radius1 / radius2);
+            ofVec2f r2 = (p2 - p1).scale(radius2 / radius1);
+
+            // Impulse
+            ofVec2f j;
+
+            // e is the coefficient of restitution. It's fun to vary this.
+            float e = 0.9;
+
+
+            float k=1/(m1*m1)+ 2/(m1*m2) +1/(m2*m2) - r1.x*r1.x/(m1*i1) - r2.x*r2.x/(m1*i2)  - r1.y*r1.y/(m1*i1)
+            - r1.y*r1.y/(m2*i1) - r1.x*r1.x/(m2*i1) - r2.x*r2.x/(m2*i2) - r2.y*r2.y/(m1*i2)
+            - r2.y*r2.y/(m2*i2) + r1.y*r1.y*r2.x*r2.x/(i1*i2) + r1.x*r1.x*r2.y*r2.y/(i1*i2) - 2*r1.x*r1.y*r2.x*r2.y/(i1*i2);
+
+            // set the impulse in the two dimensions
+            j.x = (e+1)/k * (v1.x - v2.x)*( 1/m1 - r1.x*r1.x/i1 + 1/m2 - r2.x*r2.x/i2)
+            - (e+1)/k * (v1.y - v2.y)* (r1.x*r1.y / i1 + r2.x*r2.y / i2);
+            j.y = - (e+1)/k * (v1.x - v2.x) * (r1.x*r1.y / i1 + r2.x*r2.y / i2)
+            + (e+1)/k  * (v1.y - v2.y) * ( 1/m1 - r1.y*r1.y/i1 + 1/m2 - r2.y*r2.y/i2);
+
+            // velocity and angular velocity after the collision
+            ofVec2f v1f = v1 - j / m1;
+            ofVec2f v2f = v2 + j / m2;
+            ofVec2f w1f;
+            ofVec2f w2f;
+            w1f.x = w1.x - (j.x*r1.y - j.y*r1.x) /i1;
+            w1f.y = w1.y - (j.x*r1.y - j.y*r1.x) /i1;
+            w2f.x = w2.x - (j.x*r2.y - j.y*r2.x) /i2;
+            w2f.y = w2.y - (j.x*r2.y - j.y*r2.x) /i2;
+
+            // update this particles velocities
+            v = v1f;
+            w = w1f;
+
+            particles->at(i).v = v2f;
+            particles->at(i).w = w2f;
+
+            particles->at(i).p += particles->at(i).v;
             updated = true;
-            particles->at(i).updated = true;
+            particles->at(i).updated =
         }
     }
-
     // update the position using the particles velocity
-    pos += velocity;
-    energy = 0.5 * mass * pow(velocity.length(), 2);
+    p += v;
+    energy = 0.5 * m * pow(v.length(), 2);
 }
 
 // draw the particle (the easy bit!)
 void Particle::draw(){
     ofSetColor(colour);
-    ofDrawCircle(pos.x, pos.y, radius);
-
+    ofDrawCircle(p.x, p.y, radius);
     // write debug information
     if (*debug){
-        ofDrawBitmapString(energy, pos.x + radius, pos.y + radius);
+        ofDrawBitmapString(energy, p.x + radius, p.y + radius);
     }}
 
 // debug is a variable at ofApp level. Perhaps look at extending
@@ -175,8 +225,8 @@ void Particle::setParticles(vector<Particle> *p){
 // smaller than the two particles radii combined.
 bool Particle::isInteracting(Particle * particle){
     // calculate the distance between two particles
-    float dx = pos.x - particle->pos.x;
-    float dy = pos.y - particle->pos.y;
+    float dx = p.x - particle->p.x;
+    float dy = p.y - particle->p.y;
 
     float d = sqrt(pow(dx, 2) + pow(dy,2));
 
