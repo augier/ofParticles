@@ -57,7 +57,7 @@ void Particle::setup(){
     // assign a randomised radius
     // we assume this is 'infinitesimally small' and therefore
     // the ignore the actual radius except for visualising
-    radius = ofRandom(5, 10);
+    radius = ofRandom(5, 5);
 
 //    radius = r;
     // we'll calculate it's mass as it's surface area
@@ -182,17 +182,21 @@ void Particle::update(){
             w1f.y = w1.y - (j.x*r1.y - j.y*r1.x) /i1;
             w2f.x = w2.x - (j.x*r2.y - j.y*r2.x) /i2;
             w2f.y = w2.y - (j.x*r2.y - j.y*r2.x) /i2;
+            
+            ofColor midColor = colour.lerp(particle2->colour, 0.5);
 
             // update this particles velocities
             v = v1f;
             w = w1f;
+            colour = midColor;
 
             particles->at(i).v = v2f;
             particles->at(i).w = w2f;
+            particles->at(i).colour = midColor;
 
             particles->at(i).p += particles->at(i).v;
             updated = true;
-            particles->at(i).updated =
+            particles->at(i).updated = true;
         }
     }
     // update the position using the particles velocity
