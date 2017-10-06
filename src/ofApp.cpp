@@ -225,10 +225,7 @@ void Particle::setParticles(vector<Particle> *p){
 // smaller than the two particles radii combined.
 bool Particle::isInteracting(Particle * particle){
     // calculate the distance between two particles
-    float dx = p.x - particle->p.x;
-    float dy = p.y - particle->p.y;
-
-    float d = sqrt(pow(dx, 2) + pow(dy,2));
+    float d = pos.distance(particle->pos);
 
     if (d < radius + particle->radius){
         return true;
